@@ -1,0 +1,20 @@
+{
+  "mode": "auto",
+  "color": "black",
+  "board_orientation": "white",
+  "smartness": 4000,
+  "board_roi": [
+    232,
+    146,
+    664,
+    664
+  ],
+  "start_fen": null,
+  "auto_trigger": true,
+  "poll_interval": 0.2,
+  "think_time_ms": 0,
+  "move_delay": [
+    0,
+    0
+  ]
+}
