@@ -24,7 +24,8 @@ if not clf.loaded:
 # between runs, and classifying with a stale ROI misaligns every square crop,
 # which looks like a piece-recognition bug rather than a geometry problem.
 try:
-    roi, _score = detect_board_roi(grab_screenshot(), roi_hint=cfg.board_roi)
+    img = grab_screenshot()
+    roi, _score = detect_board_roi(img)
     if roi != cfg.board_roi:
         print(f"ROI changed on screen: {cfg.board_roi} -> {roi} (updated)")
         cfg.board_roi = roi

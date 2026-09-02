@@ -21,12 +21,15 @@ def main():
     import argparse
     parser = argparse.ArgumentParser(description="AutoChess bot")
     parser.add_argument("-c", "--color", choices=["b", "w", "black", "white"], help="side to play and board orientation (b/black or w/white), overrides config.json")
+    parser.add_argument("-m", "--mode", choices=["auto", "manual", "helper"], help="run mode override (helper analyzes & draws arrows, never clicks)")
     args, _ = parser.parse_known_args()
     cfg = Config.load()
     if args.color:
         col = "black" if args.color.lower().startswith("b") else "white"
         cfg.color = col
         cfg.board_orientation = col
+    if args.mode:
+        cfg.mode = args.mode
     if not cfg.board_roi:
         print("No cached ROI - detecting board automatically...")
         try:
@@ -49,7 +52,7 @@ def main():
                 cfg.save()
                 print("Re-detected + saved ROI:", cfg.board_roi)
             else:
-                print("Cached ROI valid.")
+                print("Cached ROI valid.\n")
         except Exception as e:
             print("ROI validation failed; re-detecting board:", e)
             try:
@@ -72,11 +75,26 @@ def main():
     tracker = BoardTracker(cfg.board_orientation, cfg.board_roi, clf,
                            cfg.start_fen, our_color)
 
+    if cfg.mode == "helper":
+        from vision.helper import HelperMode
+        helper = HelperMode(tracker, best_move_once, cfg,
+                            overlay_enabled=cfg.overlay_enabled)
+        print(f"[helper] analyzing as {cfg.color}.\n"
+              "Green arrow = best move. \n"
+              f"red arrows = opponent threats (show_attacks={cfg.show_attacks}). "
+              "Press 's' to resync, 'r' to clear red, 'h' to toggle green. "
+              "Ctrl+C to stop.\n")
+        try:
+            helper.run()
+        finally:
+            shutdown()
+            return
+
     print(f"Mode={cfg.mode} Color={cfg.color} Orientation={cfg.board_orientation} "
           f"Smartness={cfg.smartness} "
           f"Auto-trigger={cfg.auto_trigger}")
-    print("Press '%s' or Enter to force-sync "
-          "(opponent just moved / start mid-game)." % HOTKEY)
+    print("Press 's' to resync (overwrite board), Enter to force-sync and play "
+          "(opponent just moved / start mid-game).")
 
     def our_turn():
         return tracker.board.turn == our_color
@@ -226,9 +244,42 @@ def main():
     side = "OUR turn -> bot will move" if our_turn() else "waiting for OPPONENT"
     print(f"Bot plays {cfg.color} ({turn_name} to move). {side}.")
 
+    def resync_board():
+        """'s' in any mode: rebuild board from a stable screen read, overwriting
+        the incremental tracker (no turn forcing)."""
+        print("[resync] s pressed - rebuilding board from screen...", flush=True)
+        placement, curr = tracker._stable_placement(tries=4)
+        if placement is None:
+            print("  resync failed: no stable board read.", flush=True)
+            return
+        # Pick a valid turn for the placement.
+        new_board = None
+        for turn in ("w", "b"):
+            try:
+                from vision import dataset as ds
+                cand = ds.board_from_placement(placement, turn)
+                if cand.is_valid():
+                    new_board = cand
+                    break
+            except Exception:
+                continue
+        if new_board is None:
+            print("  resync failed: placement invalid for both turns.", flush=True)
+            return
+        tracker.board = new_board
+        tracker.last_classified = curr
+        # Invalidate last_played so auto will reconsider.
+        nonlocal last_played_fen
+        last_played_fen = None
+        print(f"  resynced: {new_board.fen()} ({'white' if new_board.turn==chess.WHITE else 'black'} to move)", flush=True)
+
     try:
         while True:
-            if keyboard.is_pressed(HOTKEY) or keyboard.is_pressed(ENTER_HOTKEY):
+            if keyboard.is_pressed(HOTKEY):
+                resync_board()
+                time.sleep(0.3)
+                continue
+            if keyboard.is_pressed(ENTER_HOTKEY):
                 manual_sync()
                 time.sleep(0.3)
                 continue

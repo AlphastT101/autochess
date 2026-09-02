@@ -1,20 +1,22 @@
 {
-  "mode": "auto",
+  "mode": "helper",
   "color": "black",
-  "board_orientation": "white",
-  "smartness": 4000,
+  "board_orientation": "black",
+  "smartness": 3200,
   "board_roi": [
-    232,
+    228,
     146,
-    664,
-    664
+    728,
+    728
   ],
   "start_fen": null,
   "auto_trigger": true,
-  "poll_interval": 0.2,
-  "think_time_ms": 0,
+  "poll_interval": 0.5,
+  "think_time_ms": 2000,
   "move_delay": [
     0,
     0
-  ]
+  ],
+  "show_attacks": true,
+  "overlay_enabled": true
 }

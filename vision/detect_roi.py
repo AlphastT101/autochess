@@ -407,11 +407,11 @@ def save_debug_image(img, roi, path=None):
     return path
 
 
-def show_detection(roi_hint=None):
+def show_detection():
     """Detect the board and open an annotated screenshot so you can see exactly
     which region was found."""
     img = grab_screenshot()
-    roi, score = detect_board_roi(img, roi_hint)
+    roi, score = detect_board_roi(img)
     path = save_debug_image(img, roi)
     print("Debug image saved to:", path)
     print("Detected ROI:", roi, "checkerboard score:", round(score, 1))
