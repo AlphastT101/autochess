@@ -6,13 +6,13 @@
   "board_roi": [
     228,
     146,
-    728,
-    728
+    680,
+    680
   ],
   "start_fen": null,
   "auto_trigger": true,
   "poll_interval": 0.5,
-  "think_time_ms": 2000,
+  "think_time_ms": 1000,
   "move_delay": [
     0,
     0

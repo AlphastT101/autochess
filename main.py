@@ -13,7 +13,7 @@ from engine import best_move_once, shutdown
 from input.mouse import play_move, square_to_pixel
 from vision.detect_roi import find_board_roi, detect_board_roi, checkerboard_score, iou
 
-HOTKEY = "s"            # manual trigger: detect opponent move and play
+HOTKEY = "s"            # manual trigger: sync board
 ENTER_HOTKEY = "enter"  # manual sync: "opponent just moved, it's my turn now"
 
 
@@ -244,39 +244,44 @@ def main():
     side = "OUR turn -> bot will move" if our_turn() else "waiting for OPPONENT"
     print(f"Bot plays {cfg.color} ({turn_name} to move). {side}.")
 
-    def resync_board():
-        """'s' in any mode: rebuild board from a stable screen read, overwriting
-        the incremental tracker (no turn forcing)."""
-        print("[resync] s pressed - rebuilding board from screen...", flush=True)
-        placement, curr = tracker._stable_placement(tries=4)
-        if placement is None:
-            print("  resync failed: no stable board read.", flush=True)
-            return
-        # Pick a valid turn for the placement.
-        new_board = None
-        for turn in ("w", "b"):
-            try:
-                from vision import dataset as ds
-                cand = ds.board_from_placement(placement, turn)
-                if cand.is_valid():
-                    new_board = cand
-                    break
-            except Exception:
-                continue
-        if new_board is None:
-            print("  resync failed: placement invalid for both turns.", flush=True)
-            return
-        tracker.board = new_board
-        tracker.last_classified = curr
-        # Invalidate last_played so auto will reconsider.
-        nonlocal last_played_fen
-        last_played_fen = None
-        print(f"  resynced: {new_board.fen()} ({'white' if new_board.turn==chess.WHITE else 'black'} to move)", flush=True)
-
     try:
         while True:
             if keyboard.is_pressed(HOTKEY):
-                resync_board()
+                # 's' in any mode: rebuild board from a stable screen read, overwriting tracker.
+                print("[resync] s pressed - rebuilding board from screen...", flush=True)
+                placement, curr = tracker._stable_placement(tries=4)
+                if placement is None:
+                    print("  resync failed: no stable board read.", flush=True)
+                else:
+                    new_board = None
+                    fail_reason = ""
+                    for turn in ("w", "b"):
+                        try:
+                            from vision import dataset as ds
+                            cand = ds.board_from_placement(placement, turn)
+                            if cand.is_valid():
+                                new_board = cand
+                                break
+                            else:
+                                fail_reason = f"status w/b invalid"
+                        except Exception as e:
+                            fail_reason = str(e)
+                            continue
+                    if new_board is None:
+                        print(f"  resync failed: invalid placement '{placement}' {fail_reason}", flush=True)
+                        # Fallback to fuzzy force_sync
+                        try:
+                            fen = tracker.force_sync()
+                            if fen:
+                                print(f"  force_sync fallback: {fen}", flush=True)
+                                last_played_fen = None
+                        except Exception as e:
+                            print(f"  force_sync error: {e}", flush=True)
+                    else:
+                        tracker.board = new_board
+                        tracker.last_classified = curr
+                        last_played_fen = None
+                        print(f"  resynced: {new_board.fen()} ({'white' if new_board.turn==chess.WHITE else 'black'} to move)", flush=True)
                 time.sleep(0.3)
                 continue
             if keyboard.is_pressed(ENTER_HOTKEY):

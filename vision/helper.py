@@ -356,16 +356,33 @@ class HelperMode:
                         else:
                             from vision import dataset as ds
                             new_board = None
+                            fail_reason = ""
                             for turn in ("w", "b"):
                                 try:
                                     cand = ds.board_from_placement(placement, turn)
                                     if cand.is_valid():
                                         new_board = cand
                                         break
-                                except Exception:
+                                    else:
+                                        fail_reason = f"status w/b invalid (w={chess.Board(placement+' w - - 0 1').status()} b={chess.Board(placement+' b - - 0 1').status()})"
+                                except Exception as e:
+                                    fail_reason = str(e)
                                     continue
                             if new_board is None:
-                                print("  resync failed: invalid placement.", flush=True)
+                                print(f"  resync failed: invalid placement '{placement}' {fail_reason}", flush=True)
+                                # Fallback: try force_sync fuzzy matching
+                                try:
+                                    fen = self.tracker.force_sync()
+                                    if fen:
+                                        print(f"  force_sync fallback succeeded: {fen}", flush=True)
+                                        new_board = self.tracker.board
+                                        self.board = new_board
+                                        self._last_analyzed_fen = None
+                                        self._last_moved_uci = None
+                                        self._green = None
+                                        self._reds = []
+                                except Exception as e:
+                                    print(f"  force_sync fallback error: {e}", flush=True)
                             else:
                                 self.tracker.board = new_board
                                 self.tracker.last_classified = curr
